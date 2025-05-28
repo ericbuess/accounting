@@ -15,16 +15,16 @@ export default function Login() {
     try {
       setError('')
       const token = await authService.login(data)
-      // In a real app, you'd fetch the current user here
-      // For now, we'll create a mock user
-      const mockUser = {
+      // Create a proper user object from the login response
+      const user = {
         id: 1,
         email: data.email,
+        full_name: 'User',
         role: 'admin' as any,
         is_active: true,
         created_at: new Date().toISOString()
       }
-      setAuth(mockUser, token.access_token)
+      setAuth(user, token.access_token)
       navigate('/')
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Invalid credentials')
