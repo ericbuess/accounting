@@ -18,7 +18,7 @@ export default function Accounts() {
     queryKey: ['accounts', selectedCompanyId],
     queryFn: async () => {
       if (!selectedCompanyId) return []
-      const response = await api.get<Account[]>(`/accounts?company_id=${selectedCompanyId}`)
+      const response = await api.get<Account[]>(`/accounts/?company_id=${selectedCompanyId}`)
       return response.data
     },
     enabled: !!selectedCompanyId

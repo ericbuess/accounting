@@ -19,7 +19,7 @@ export default function JournalEntries() {
     queryKey: ['journal-entries', selectedCompanyId],
     queryFn: async () => {
       if (!selectedCompanyId) return []
-      const response = await api.get<JournalEntry[]>(`/journal?company_id=${selectedCompanyId}`)
+      const response = await api.get<JournalEntry[]>(`/journal/?company_id=${selectedCompanyId}`)
       return response.data
     },
     enabled: !!selectedCompanyId
