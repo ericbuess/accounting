@@ -9,7 +9,7 @@ export default function Accounts() {
   const { data: companies } = useQuery({
     queryKey: ['companies'],
     queryFn: async () => {
-      const response = await api.get<Company[]>('/companies')
+      const response = await api.get<Company[]>('/companies/')
       return response.data
     }
   })

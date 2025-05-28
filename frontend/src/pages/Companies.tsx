@@ -9,7 +9,7 @@ export default function Companies() {
   const { data: companies, isLoading } = useQuery({
     queryKey: ['companies'],
     queryFn: async () => {
-      const response = await api.get<Company[]>('/companies')
+      const response = await api.get<Company[]>('/companies/')
       return response.data
     }
   })

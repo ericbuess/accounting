@@ -25,7 +25,10 @@ export default function Login() {
         created_at: new Date().toISOString()
       }
       setAuth(user, token.access_token)
-      navigate('/')
+      // Small delay to ensure state is saved
+      setTimeout(() => {
+        navigate('/')
+      }, 100)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Invalid credentials')
     }
