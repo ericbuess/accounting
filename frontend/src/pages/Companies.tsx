@@ -4,7 +4,7 @@ import api from '../services/api'
 import { Company } from '../types'
 
 export default function Companies() {
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [_isCreateModalOpen, _setIsCreateModalOpen] = useState(false)
 
   const { data: companies, isLoading } = useQuery({
     queryKey: ['companies'],
