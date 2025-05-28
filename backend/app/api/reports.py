@@ -1,11 +1,11 @@
 from typing import List, Dict, Any
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from ..database import get_db
-from ..models import Account, JournalLine, Company, User
+from ..models import Account, JournalLine, Company, User, JournalEntry
 from ..models.account import AccountType
 from ..core.auth import get_current_active_user
 
@@ -19,7 +19,7 @@ def get_account_balance(db: Session, account_id: int, end_date: date) -> Decimal
         JournalLine.entry
     ).filter(
         JournalLine.account_id == account_id,
-        JournalLine.entry.has(date <= end_date)
+        JournalEntry.date <= end_date
     ).scalar()
     
     return Decimal(str(result)) if result else Decimal("0.00")
@@ -121,8 +121,8 @@ def get_income_statement(
             JournalLine.entry
         ).filter(
             JournalLine.account_id == account.id,
-            JournalLine.entry.has(date >= start_date),
-            JournalLine.entry.has(date <= end_date)
+            JournalEntry.date >= start_date,
+            JournalEntry.date <= end_date
         ).scalar()
         
         balance = Decimal(str(result)) if result else Decimal("0.00")
@@ -187,7 +187,7 @@ def get_trial_balance(
             JournalLine.entry
         ).filter(
             JournalLine.account_id == account.id,
-            JournalLine.entry.has(date <= as_of_date)
+            JournalEntry.date <= as_of_date
         ).first()
         
         total_debit = Decimal(str(result.debit)) if result.debit else Decimal("0.00")
@@ -214,3 +214,94 @@ def get_trial_balance(
     trial_balance["total_credit"] = float(trial_balance["total_credit"])
     
     return trial_balance
+
+@router.get("/dashboard/")
+def get_dashboard(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get dashboard summary data for all companies"""
+    # Get all companies
+    companies = db.query(Company).all()
+    
+    dashboard_data = {
+        "total_assets": Decimal("0.00"),
+        "total_liabilities": Decimal("0.00"),
+        "net_income": Decimal("0.00"),
+        "companies": []
+    }
+    
+    # Calculate totals across all companies
+    for company in companies:
+        # Get all accounts for the company
+        accounts = db.query(Account).filter(Account.company_id == company.id).all()
+        
+        company_data = {
+            "id": company.id,
+            "name": company.name,
+            "assets": Decimal("0.00"),
+            "liabilities": Decimal("0.00"),
+            "equity": Decimal("0.00"),
+            "revenue": Decimal("0.00"),
+            "expenses": Decimal("0.00")
+        }
+        
+        # Calculate balances for each account
+        for account in accounts:
+            balance = get_account_balance(db, account.id, date.today())
+            
+            if account.type == AccountType.ASSET:
+                company_data["assets"] += balance
+                dashboard_data["total_assets"] += balance
+            elif account.type == AccountType.LIABILITY:
+                company_data["liabilities"] += abs(balance)
+                dashboard_data["total_liabilities"] += abs(balance)
+            elif account.type == AccountType.EQUITY:
+                company_data["equity"] += abs(balance)
+            elif account.type == AccountType.REVENUE:
+                # Get current month revenue
+                start_of_month = date.today().replace(day=1)
+                result = db.query(
+                    func.coalesce(func.sum(JournalLine.credit), 0) - func.coalesce(func.sum(JournalLine.debit), 0)
+                ).join(
+                    JournalLine.entry
+                ).filter(
+                    JournalLine.account_id == account.id,
+                    JournalEntry.date >= start_of_month
+                ).scalar()
+                revenue = Decimal(str(result)) if result else Decimal("0.00")
+                company_data["revenue"] += revenue
+            elif account.type == AccountType.EXPENSE:
+                # Get current month expenses
+                start_of_month = date.today().replace(day=1)
+                result = db.query(
+                    func.coalesce(func.sum(JournalLine.debit), 0) - func.coalesce(func.sum(JournalLine.credit), 0)
+                ).join(
+                    JournalLine.entry
+                ).filter(
+                    JournalLine.account_id == account.id,
+                    JournalEntry.date >= start_of_month
+                ).scalar()
+                expense = Decimal(str(result)) if result else Decimal("0.00")
+                company_data["expenses"] += expense
+        
+        # Calculate net income for the company (current month)
+        company_data["net_income"] = company_data["revenue"] - company_data["expenses"]
+        dashboard_data["net_income"] += company_data["net_income"]
+        
+        # Convert Decimal to float for JSON serialization
+        company_data["assets"] = float(company_data["assets"])
+        company_data["liabilities"] = float(company_data["liabilities"])
+        company_data["equity"] = float(company_data["equity"])
+        company_data["revenue"] = float(company_data["revenue"])
+        company_data["expenses"] = float(company_data["expenses"])
+        company_data["net_income"] = float(company_data["net_income"])
+        
+        dashboard_data["companies"].append(company_data)
+    
+    # Convert Decimal to float for JSON serialization
+    dashboard_data["total_assets"] = float(dashboard_data["total_assets"])
+    dashboard_data["total_liabilities"] = float(dashboard_data["total_liabilities"])
+    dashboard_data["net_income"] = float(dashboard_data["net_income"])
+    
+    return dashboard_data
