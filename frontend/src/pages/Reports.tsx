@@ -93,22 +93,48 @@ export default function Reports() {
       }
       
       if (response) {
+        console.log('Report data received:', response.data)
         setReportData(response.data)
       }
     } catch (error) {
       console.error('Error generating report:', error)
+      // Clear report data on error to prevent stale data
+      setReportData(null)
     } finally {
       setIsLoading(false)
     }
   }
 
-  const renderBalanceSheet = (data: BalanceSheet) => (
-    <div className="space-y-6">
-      <div className="text-center mb-4">
-        <h4 className="text-lg font-semibold">{data.company}</h4>
-        <p className="text-sm text-gray-600">Balance Sheet</p>
-        <p className="text-sm text-gray-600">As of {format(new Date(data.as_of_date), 'MMMM d, yyyy')}</p>
-      </div>
+  const renderBalanceSheet = (data: BalanceSheet) => {
+    // Add defensive checks
+    if (!data || !data.assets || !data.liabilities || !data.equity) {
+      return (
+        <div className="text-center text-gray-500 py-4">
+          Unable to display balance sheet. Invalid data format.
+        </div>
+      )
+    }
+
+    // Safe date formatting
+    let formattedDate = 'Invalid date'
+    try {
+      if (data.as_of_date) {
+        const date = new Date(data.as_of_date)
+        if (!isNaN(date.getTime())) {
+          formattedDate = format(date, 'MMMM d, yyyy')
+        }
+      }
+    } catch (error) {
+      console.error('Error formatting date:', error)
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="text-center mb-4">
+          <h4 className="text-lg font-semibold">{data.company}</h4>
+          <p className="text-sm text-gray-600">Balance Sheet</p>
+          <p className="text-sm text-gray-600">As of {formattedDate}</p>
+        </div>
       
       {/* Assets */}
       <div>
@@ -159,99 +185,141 @@ export default function Reports() {
         </div>
       </div>
       
-      <div className="flex justify-between border-t-2 pt-2 mt-4 font-bold">
-        <span>Total Liabilities and Equity</span>
-        <span>{formatCurrency(data.total_liabilities_and_equity)}</span>
-      </div>
-    </div>
-  )
-
-  const renderIncomeStatement = (data: IncomeStatement) => (
-    <div className="space-y-6">
-      <div className="text-center mb-4">
-        <h4 className="text-lg font-semibold">{data.company}</h4>
-        <p className="text-sm text-gray-600">Income Statement</p>
-        <p className="text-sm text-gray-600">{data.period}</p>
-      </div>
-      
-      {/* Revenue */}
-      <div>
-        <h5 className="font-semibold text-gray-900 mb-2">REVENUE</h5>
-        {data.revenue.accounts.length > 0 ? (
-          data.revenue.accounts.map((account, idx) => (
-            <div key={idx} className="flex justify-between py-1">
-              <span className="text-sm">{account.code} - {account.name}</span>
-              <span className="text-sm">{formatCurrency(account.balance)}</span>
-            </div>
-          ))
-        ) : (
-          <div className="text-sm text-gray-500 py-1">No revenue</div>
-        )}
-        <div className="flex justify-between border-t pt-1 mt-2 font-semibold">
-          <span>Total Revenue</span>
-          <span>{formatCurrency(data.revenue.total)}</span>
+        <div className="flex justify-between border-t-2 pt-2 mt-4 font-bold">
+          <span>Total Liabilities and Equity</span>
+          <span>{formatCurrency(data.total_liabilities_and_equity)}</span>
         </div>
       </div>
-      
-      {/* Expenses */}
-      <div>
-        <h5 className="font-semibold text-gray-900 mb-2">EXPENSES</h5>
-        {data.expenses.accounts.length > 0 ? (
-          data.expenses.accounts.map((account, idx) => (
-            <div key={idx} className="flex justify-between py-1">
-              <span className="text-sm">{account.code} - {account.name}</span>
-              <span className="text-sm">{formatCurrency(account.balance)}</span>
-            </div>
-          ))
-        ) : (
-          <div className="text-sm text-gray-500 py-1">No expenses</div>
-        )}
-        <div className="flex justify-between border-t pt-1 mt-2 font-semibold">
-          <span>Total Expenses</span>
-          <span>{formatCurrency(data.expenses.total)}</span>
+    )
+  }
+
+  const renderIncomeStatement = (data: IncomeStatement) => {
+    // Add defensive checks
+    if (!data || !data.revenue || !data.expenses) {
+      return (
+        <div className="text-center text-gray-500 py-4">
+          Unable to display income statement. Invalid data format.
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="text-center mb-4">
+          <h4 className="text-lg font-semibold">{data.company}</h4>
+          <p className="text-sm text-gray-600">Income Statement</p>
+          <p className="text-sm text-gray-600">{data.period}</p>
+        </div>
+        
+        {/* Revenue */}
+        <div>
+          <h5 className="font-semibold text-gray-900 mb-2">REVENUE</h5>
+          {data.revenue.accounts && data.revenue.accounts.length > 0 ? (
+            data.revenue.accounts.map((account, idx) => (
+              <div key={idx} className="flex justify-between py-1">
+                <span className="text-sm">{account.code} - {account.name}</span>
+                <span className="text-sm">{formatCurrency(account.balance)}</span>
+              </div>
+            ))
+          ) : (
+            <div className="text-sm text-gray-500 py-1">No revenue</div>
+          )}
+          <div className="flex justify-between border-t pt-1 mt-2 font-semibold">
+            <span>Total Revenue</span>
+            <span>{formatCurrency(data.revenue.total || 0)}</span>
+          </div>
+        </div>
+        
+        {/* Expenses */}
+        <div>
+          <h5 className="font-semibold text-gray-900 mb-2">EXPENSES</h5>
+          {data.expenses.accounts && data.expenses.accounts.length > 0 ? (
+            data.expenses.accounts.map((account, idx) => (
+              <div key={idx} className="flex justify-between py-1">
+                <span className="text-sm">{account.code} - {account.name}</span>
+                <span className="text-sm">{formatCurrency(account.balance)}</span>
+              </div>
+            ))
+          ) : (
+            <div className="text-sm text-gray-500 py-1">No expenses</div>
+          )}
+          <div className="flex justify-between border-t pt-1 mt-2 font-semibold">
+            <span>Total Expenses</span>
+            <span>{formatCurrency(data.expenses.total || 0)}</span>
+          </div>
+        </div>
+        
+        <div className="flex justify-between border-t-2 pt-2 mt-4 font-bold">
+          <span>Net Income</span>
+          <span>{formatCurrency(data.net_income || 0)}</span>
         </div>
       </div>
-      
-      <div className="flex justify-between border-t-2 pt-2 mt-4 font-bold">
-        <span>Net Income</span>
-        <span>{formatCurrency(data.net_income)}</span>
-      </div>
-    </div>
-  )
+    )
+  }
 
-  const renderTrialBalance = (data: TrialBalance) => (
-    <div className="space-y-4">
-      <div className="text-center mb-4">
-        <h4 className="text-lg font-semibold">{data.company}</h4>
-        <p className="text-sm text-gray-600">Trial Balance</p>
-        <p className="text-sm text-gray-600">As of {format(new Date(data.as_of_date), 'MMMM d, yyyy')}</p>
-      </div>
-      
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead>
-          <tr>
-            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
-            <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Debit</th>
-            <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Credit</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200">
-          {data.accounts.map((account, idx) => (
-            <tr key={idx}>
-              <td className="px-2 py-2 text-sm">{account.code} - {account.name}</td>
-              <td className="px-2 py-2 text-sm text-right">{account.debit > 0 ? formatCurrency(account.debit) : ''}</td>
-              <td className="px-2 py-2 text-sm text-right">{account.credit > 0 ? formatCurrency(account.credit) : ''}</td>
+  const renderTrialBalance = (data: TrialBalance) => {
+    // Add defensive checks
+    if (!data) {
+      return (
+        <div className="text-center text-gray-500 py-4">
+          Unable to display trial balance. Invalid data format.
+        </div>
+      )
+    }
+
+    // Safe date formatting
+    let formattedDate = 'Invalid date'
+    try {
+      if (data.as_of_date) {
+        const date = new Date(data.as_of_date)
+        if (!isNaN(date.getTime())) {
+          formattedDate = format(date, 'MMMM d, yyyy')
+        }
+      }
+    } catch (error) {
+      console.error('Error formatting date:', error)
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="text-center mb-4">
+          <h4 className="text-lg font-semibold">{data.company}</h4>
+          <p className="text-sm text-gray-600">Trial Balance</p>
+          <p className="text-sm text-gray-600">As of {formattedDate}</p>
+        </div>
+        
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead>
+            <tr>
+              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
+              <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Debit</th>
+              <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Credit</th>
             </tr>
-          ))}
-          <tr className="font-bold">
-            <td className="px-2 py-2">Totals</td>
-            <td className="px-2 py-2 text-right">{formatCurrency(data.total_debit)}</td>
-            <td className="px-2 py-2 text-right">{formatCurrency(data.total_credit)}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  )
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {data.accounts && data.accounts.length > 0 ? (
+              data.accounts.map((account, idx) => (
+                <tr key={idx}>
+                  <td className="px-2 py-2 text-sm">{account.code} - {account.name}</td>
+                  <td className="px-2 py-2 text-sm text-right">{account.debit > 0 ? formatCurrency(account.debit) : ''}</td>
+                  <td className="px-2 py-2 text-sm text-right">{account.credit > 0 ? formatCurrency(account.credit) : ''}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={3} className="text-center py-4 text-gray-500">No accounts with balances</td>
+              </tr>
+            )}
+            <tr className="font-bold">
+              <td className="px-2 py-2">Totals</td>
+              <td className="px-2 py-2 text-right">{formatCurrency(data.total_debit || 0)}</td>
+              <td className="px-2 py-2 text-right">{formatCurrency(data.total_credit || 0)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    )
+  }
 
   return (
     <div className="px-4 py-6 sm:px-0">
